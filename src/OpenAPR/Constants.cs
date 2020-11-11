@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace APRCalculator
+namespace OpenAPR
 {
     public struct UnitPeriod
     {
-        public UnitPeriodType periodType;
-        public int numPeriods;
+        public UnitPeriodType PeriodType;
+        public int NumPeriods;
     }
 
     public enum UnitPeriodType
@@ -22,9 +22,5 @@ namespace APRCalculator
     {
         public int Periods;
         public int OddDays;
-    }
-
-    public class Constants
-    {
     }
 }

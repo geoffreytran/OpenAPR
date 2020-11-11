@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace APRCalculator
+namespace OpenAPR
 {
     #region "Enums"
     public enum LineItemType
@@ -21,45 +21,38 @@ namespace APRCalculator
     public class LineItem
     {
         #region "private props"
-        double m_Amount = 0.0d;
-        PeriodSpan m_Span;
-        private LineItemType m_Type;
-        private DateTime m_Date;
-        private double m_PVIF;
-        private double m_PresentValue;
-        private double m_Balance;
-        private UnitPeriod m_Recurrence;
-        private DateType m_DateType;
-        private LineItemCollection m_Parent;
-        private int m_Occurences;
-        private double m_ActiveRate;
+
+        private double amount = 0.0d;
+        private PeriodSpan span;
+        private readonly DateType dateType;
+
         #endregion
 
         #region ".ctor"
-        public LineItem(double Amount, DateTime Date, LineItemType liType)
+        public LineItem(double amount, DateTime date, LineItemType liType)
         {
-            if (Amount < 0)
+            if (amount < 0)
             {
                 throw new ApplicationException("New Line Item must have an Amount >= 0");
             }
-            if (liType == LineItemType.Disbursement) { Amount = Amount * -1; }
-            m_Amount = Amount;
-            m_Date = Date;
-            m_DateType = DateType.Date;
-            m_Type = liType;
+            if (liType == LineItemType.Disbursement) { amount *= -1; }
+            this.amount = amount;
+            Date = date;
+            dateType = DateType.Date;
+            Type = liType;
         }
-        public LineItem(double Amount, int Periods, int OddDays, LineItemType liType)
+        public LineItem(double amount, int periods, int oddDays, LineItemType liType)
         {
-            if (Amount < 0)
+            if (amount < 0)
             {
                 throw new ApplicationException("New Line Item must have an Amount >= 0");
             }
-            if (liType == LineItemType.Disbursement) { Amount = Amount * -1; }
-            m_Amount = Amount;
-            this.m_Span.Periods = Periods;
-            this.m_Span.OddDays = OddDays;
-            m_DateType = DateType.Periods;
-            m_Type = liType;
+            if (liType == LineItemType.Disbursement) { amount *= -1; }
+            this.amount = amount;
+            this.span.Periods = periods;
+            this.span.OddDays = oddDays;
+            dateType = DateType.Periods;
+            Type = liType;
         }
         #endregion
 
@@ -69,30 +62,14 @@ namespace APRCalculator
         /// </summary>
         public double Amount
         {
-            get
-            {
-                return m_Amount * (int)m_Type;
-            }
-            set 
-            {
-                m_Amount = value;
-            }
+            get => amount * (int)Type;
+            set => amount = value;
         }
 
         /// <summary>
         /// The Date of the Line Item
         /// </summary>
-        public DateTime Date
-        {
-            get
-            {
-                return m_Date;
-            }
-            set
-            {
-                m_Date = value;
-            }
-        }
+        public DateTime Date { get; set; }
 
         /// <summary>
         /// The Recurrence of Periods after the first Line Item.  Usually
@@ -100,14 +77,8 @@ namespace APRCalculator
         /// </summary>
         public int Periods
         {
-            get
-            {
-                return m_Span.Periods;
-            }
-            set
-            {
-                m_Span.Periods = value;
-            }
+            get => span.Periods;
+            set => span.Periods = value;
         }
 
         /// <summary>
@@ -118,133 +89,51 @@ namespace APRCalculator
         /// </summary>
         public int OddDays
         {
-            get
-            {
-                return m_Span.OddDays;
-            }
-            set
-            {
-                m_Span.OddDays = value;
-            }
+            get => span.OddDays;
+            set => span.OddDays = value;
         }
 
         /// <summary>
         /// The Type of Line Item this is:  Payment or Disbursement
         /// </summary>
-        public LineItemType Type
-        {
-            get
-            {
-                return this.m_Type;
-            }
-            set
-            {
-                m_Type = value;
-            }
-        }
+        public LineItemType Type { get; set; }
 
         /// <summary>
         /// The Period Type for recurrence.  
         /// </summary>
-        public UnitPeriod RecurrencePeriod
-        {
-            get
-            {
-                return this.m_Recurrence;
-            }
-            set
-            {
-                this.m_Recurrence = value;
-            }
-        }
+        public UnitPeriod RecurrencePeriod { get; set; }
 
         /// <summary>
         /// The Present Value Interest Factor for this Line Item
         /// </summary>
-        public double PVIF
-        {
-            get
-            {
-                return this.m_PVIF;
-            }
-            set
-            {
-                this.m_PVIF = value;
-            }
-        }
+        public double PVIF { get; set; }
 
         /// <summary>
         /// The Present Value of the Line Item
         /// </summary>
-        public double PresentValue
-        {
-            get
-            {
-                return this.m_PresentValue;
-            }
-            set
-            {
-                this.m_PresentValue = value;
-            }
-        }
+        public double PresentValue { get; set; }
 
         /// <summary>
         /// The Balance of the Loan as of this Line Item
         /// </summary>
-        public double Balance
-        {
-            get
-            {
-                return this.m_Balance;
-            }
-            set
-            {
-                this.m_Balance = value;
-            }
-        }
+        public double Balance { get; private set; }
 
         /// <summary>
         /// The Parent Collection for this Line Item
         /// </summary>
-        public LineItemCollection Parent
-        {
-            get
-            {
-                return this.m_Parent;
-            }
-            set
-            {
-                this.m_Parent = value;
-            }
-        }
+        public LineItemCollection Parent { get; set; }
 
         /// <summary>
         /// The Number of times this line item repeats for the given Recurrence Period
         /// </summary>
-        public int NumberOccurrences
-        {
-            get
-            {
-                return this.m_Occurences;
-            }
-            set
-            {
-                m_Occurences = value;
-            }
-        }
+        public int NumberOccurrences { get; set; }
 
         /// <summary>
         /// The Current Active APR Rate
         /// </summary>
-        public double ActiveRate
-        {
-            get
-            {
-                return this.m_ActiveRate;
-            }
-        }
+        public double ActiveRate { get; private set; }
 
-#endregion
+        #endregion
 
         #region "Methods"
         /// <summary>
@@ -252,58 +141,48 @@ namespace APRCalculator
         /// </summary>
         internal void Complete()
         {
-            if (this.m_DateType == DateType.Date)
+            if (this.dateType == DateType.Date)
             {
-                this.m_Span = DateTimeCalculations.GetNumberPeriods(this.Parent.StartDate, this.m_Date, this.Parent.CommonPeriod);
+                this.span = DateTimeCalculations.GetNumberPeriods(this.Parent.StartDate, this.Date, this.Parent.CommonPeriod);
             }
             else
             {
-                if (this.Parent.CommonPeriod.numPeriods < 1 || this.Parent.CommonPeriod.numPeriods < 1)
+                if (this.Parent.CommonPeriod.NumPeriods < 1 || this.Parent.CommonPeriod.NumPeriods < 1)
                 {
                     throw new ApplicationException("Cannot mark LineItem for completion.  A period has been specified, but there is no common period for the Parent LineItemCollection Class");
                 }
-                this.m_Date = DateTimeCalculations.GetDateFromPeriod(this.m_Span, this.Parent.StartDate, this.Parent.CommonPeriod);
+                this.Date = DateTimeCalculations.GetDateFromPeriod(this.span, this.Parent.StartDate, this.Parent.CommonPeriod);
             }
         }
 
         /// <summary>
         /// Sets the Active Interest Rate
         /// </summary>
-        public void SetActiveRate(double ActiveRate, double PriorBalance)
+        public void SetActiveRate(double activeRate, double priorBalance)
         {
-            this.m_ActiveRate = ActiveRate;
-            if(this.m_Occurences > 1)
+            this.ActiveRate = activeRate;
+            if(this.NumberOccurrences > 1)
             {
-                this.m_PVIF = FinancialCalculations.GetPVIFA(this.Parent.StartDate, this.m_Date,
-                                                                this.m_Recurrence, this.m_ActiveRate,
+                this.PVIF = FinancialCalculations.GetPresentValueInterestFactorAnnuity(this.Parent.StartDate, this.Date,
+                                                                this.RecurrencePeriod, this.ActiveRate,
                                                                 this.Parent.PeriodsPerYear, this.Parent.DaysPerPeriod,
-                                                                this.m_Occurences, this.Parent.CommonPeriod);
+                                                                this.NumberOccurrences, this.Parent.CommonPeriod);
             }
             else
             {
-                this.m_PVIF = FinancialCalculations.GetPVIF(this.m_Span, this.m_ActiveRate, this.Parent.PeriodsPerYear, this.Parent.DaysPerPeriod);
+                this.PVIF = FinancialCalculations.GetPresentValueInterestFactor(this.span, this.ActiveRate, this.Parent.PeriodsPerYear, this.Parent.DaysPerPeriod);
             }
             
-            this.m_PresentValue = this.m_Amount * this.m_PVIF;
-            this.m_Balance = PriorBalance + this.m_PresentValue;
+            this.PresentValue = this.amount * this.PVIF;
+            this.Balance = priorBalance + this.PresentValue;
         }
 
         /// <summary>
         /// Pulls an XmlNode from the LineItem
         /// </summary>
-        public String ToXml()
+        public string ToJson()
         {
-            return "<LineItem>\n" +
-                    "   <Date>" + this.m_Date.ToShortDateString() + "</Date>\n" +
-                    "   <Amount>" + this.m_Amount.ToString() + "</Amount>\n" +
-                    "   <UnitPeriods>" + this.m_Span.Periods.ToString() + "</UnitPeriods>\n" +
-                    "   <OddDays>" + this.m_Span.OddDays.ToString() + "</OddDays>\n" +
-                    "   <NumberOccurrences>" + this.m_Occurences.ToString() + "</NumberOccurrences>\n" + 
-                    "   <Recurrence>" + DateTimeCalculations.GetUnitPeriodString(this.m_Recurrence) + "</Recurrence>\n" +
-                    "   <PVIF>" + this.m_PVIF.ToString() + "</PVIF>\n" +
-                    "   <PresentValue>" + this.m_PresentValue.ToString() + "</PVIF>\n" +
-                    "   <Balance>" + this.m_Balance.ToString() + "</Balance>\n" +
-                   "</LineItem>";
+            return System.Text.Json.JsonSerializer.Serialize(this);
         }
 
         

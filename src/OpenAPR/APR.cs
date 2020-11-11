@@ -2,84 +2,53 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
-namespace APRCalculator
+namespace OpenAPR
 {
-    public class APR
+    public sealed class Apr
     {
-        LineItemCollection m_LineItems;
-        StringBuilder sb;
-        double m_APR = 0.0d;
+        private readonly ILogger<Apr> logger;
 
-        public APR(LineItemCollection LineItems)
+        public Apr(ILogger<Apr> logger, LineItemCollection lineItems)
         {
-            this.m_LineItems = LineItems;
-            sb = new StringBuilder();
+            this.LineItems = lineItems ?? throw new ArgumentNullException(nameof(lineItems));
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <summary>
         /// The Calculated APR
         /// </summary>
-        public double CalculatedAPR
-        {
-            get
-            {
-                return this.m_APR;
-            }
-        }
+        public double CalculatedAprCalc { get; private set; } = 0.0d;
 
         /// <summary>
         /// A LineItems Item Collection
         /// </summary>
-        public LineItemCollection LineItems
-        {
-            get
-            {
-                return this.m_LineItems;
-            }
-        }
+        public LineItemCollection LineItems { get; private set; }
 
         /// <summary>
         /// The Unit Period Type
         /// </summary>
         public UnitPeriod UnitPeriod
         {
-            get
-            {
-                if(this.m_LineItems == null)
-                {
-                    throw new ApplicationException("Line Items Must be Set First");
-                }
-                return this.m_LineItems.CommonPeriod;
-            }
-            set
-            {
-                if(this.m_LineItems == null)
-                {
-                    throw new ApplicationException("Line Items Must be Set First");
-                }
-                this.LineItems.CommonPeriod = value;
-            }
+            get => this.LineItems.CommonPeriod;
+            set => this.LineItems.CommonPeriod = value;
         }
 
         /// <summary>
-        /// The Entire APR Output as XML
+        /// The Entire APR Output as Json
         /// </summary>
-        public String ToXml()
+        public string ToJson()
         {
-            return "<APR>\n" +
-                " <CalculatedAPR>" + this.m_APR.ToString() + "</CalculatedAPR>" +
-                m_LineItems.ToXml() +
-                sb.ToString() +
-                "</APR>";
+            return System.Text.Json.JsonSerializer.Serialize(this);
         }
 
         /// <summary>
         /// Calculate the APR passing in the interest rate as a starting point
         /// </summary>
-        public double Calculate(double StartingRate)
+        public double Calculate(double startingRate)
         {
-            return calculateAPR(StartingRate);
+            return calculateAPR(startingRate);
         }
 
         /// <summary>
@@ -92,51 +61,54 @@ namespace APRCalculator
 
         private double calculateAPR(double rate)
         {
-            sb.AppendLine("   <APRIterations>");
-            this.m_APR = rate;
-            if (this.m_LineItems == null)
+            var sb = new StringBuilder();
+            sb.Append("<APRIterations>");
+            this.CalculatedAprCalc = rate;
+            if (this.LineItems == null)
             {
                 throw new ApplicationException("LineItems must be input first");
             }
-            if (!this.m_LineItems.Completed)
+            if (!this.LineItems.Completed)
             {
-                this.m_LineItems.MarkComplete();
+                this.LineItems.MarkComplete();
             }
-            int iIterations = 0;
-            double dLastBalance = 0;
-            double dPrecision = 0.1d;
-            this.m_LineItems.Sort();
+            var iterations = 0;
+            var lastBalance = 0.0d;
+            var precision = 0.1d;
+            this.LineItems.Sort();
 
             do
             {
                 //Set the active rate and iterate through all the line items, ultimately
                 //getting a final balance
-                this.m_LineItems.SetActiveRate(m_APR);
-                sb.Append("     <Iteration Item=\"" + iIterations.ToString() + "\">");
-                sb.Append("       <Precision>" + dPrecision.ToString() + "</Precision>");
-                sb.Append("       <Rate>" + m_APR.ToString() + "</Rate>");
-                sb.Append("       <FinalBalance>" + this.m_LineItems.FinalBalance.ToString() + "</FinalBalance>");
-                sb.Append("     </Iteration>");
-                iIterations++;
+                this.LineItems.SetActiveRate(CalculatedAprCalc);
+                sb.Append($"<Iteration Item=\"{iterations}\">");
+                sb.Append($"<Precision>{precision}</Precision>");
+                sb.Append($"<Rate>{CalculatedAprCalc}</Rate>");
+                sb.Append($"<FinalBalance>{this.LineItems.FinalBalance}</FinalBalance>");
+                sb.Append("</Iteration>");
+                iterations++;
                 //If the last balance was on the other side of the Zero from this one
                 //then we need to get more precise...
-                if ((dLastBalance < 0 && this.m_LineItems.FinalBalance > 0) ||
-                        (dLastBalance > 0 && this.m_LineItems.FinalBalance < 0))
+                if ((lastBalance < 0 && this.LineItems.FinalBalance > 0) ||
+                        (lastBalance > 0 && this.LineItems.FinalBalance < 0))
                 {
-                    dPrecision = dPrecision / 10;
+                    precision /= 10;
                 }
 
-                if ((dLastBalance < 0 && dPrecision > 0) ||
-                        (dLastBalance > 0 && dPrecision < 0))
+                if ((lastBalance < 0 && precision > 0) ||
+                        (lastBalance > 0 && precision < 0))
                 {
-                    dPrecision = dPrecision * -1;
+                    precision *= -1;
                 }
 
-                m_APR += dPrecision;
+                CalculatedAprCalc += precision;
 
-                dLastBalance = this.m_LineItems.FinalBalance;
-            } while ((this.m_LineItems.FinalBalance > 0.001 || this.m_LineItems.FinalBalance < -0.001) && iIterations < 1000);
-            return m_APR;
+                lastBalance = this.LineItems.FinalBalance;
+            } while ((this.LineItems.FinalBalance > 0.001 || this.LineItems.FinalBalance < -0.001) && iterations < 1000);
+            
+            logger.LogDebug("APRCalc Diagnostics: {0}", sb);
+            return CalculatedAprCalc;
         }
     }
 }

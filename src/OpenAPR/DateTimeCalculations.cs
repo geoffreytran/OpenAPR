@@ -1,36 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
-namespace APRCalculator
+namespace OpenAPR
 {
-    public class DateTimeCalculations
+    public static class DateTimeCalculations
     {
         /// <summary>
         /// Gets a Date based on a given period in the Loan Lifecycle.
         /// </summary>
-        internal static DateTime GetDateFromPeriod(PeriodSpan Span, DateTime StartDate, UnitPeriod CommonPeriod)
+        internal static DateTime GetDateFromPeriod(PeriodSpan span, DateTime startDate, UnitPeriod commonPeriod)
         {
-            DateTime dtReturn;
             try
             {
-                if (CommonPeriod.periodType == UnitPeriodType.Monthly)
+                return commonPeriod.PeriodType switch
                 {
-                    dtReturn = StartDate.AddMonths(CommonPeriod.numPeriods * Span.Periods).AddDays(Span.OddDays);
-                }
-                else if (CommonPeriod.periodType == UnitPeriodType.Yearly)
-                {
-                    dtReturn = StartDate.AddYears(CommonPeriod.numPeriods * Span.Periods).AddDays(Span.OddDays);
-                }
-                else if (CommonPeriod.periodType == UnitPeriodType.Weekly)
-                {
-                    dtReturn = StartDate.AddDays(CommonPeriod.numPeriods * Span.Periods * 7).AddDays(Span.OddDays);
-                }
-                else
-                {
-                    dtReturn = StartDate.AddDays(CommonPeriod.numPeriods * Span.Periods);
-                }
-                return dtReturn;
+                    UnitPeriodType.Monthly => startDate.AddMonths(commonPeriod.NumPeriods * span.Periods)
+                        .AddDays(span.OddDays),
+                    UnitPeriodType.Yearly => startDate.AddYears(commonPeriod.NumPeriods * span.Periods)
+                        .AddDays(span.OddDays),
+                    UnitPeriodType.Weekly => startDate.AddDays(commonPeriod.NumPeriods * span.Periods * 7)
+                        .AddDays(span.OddDays),
+                    _ => startDate.AddDays(commonPeriod.NumPeriods * span.Periods)
+                };
             }
             catch (Exception ex)
             {
@@ -44,12 +37,12 @@ namespace APRCalculator
         /// </summary>
         internal static double PeriodsPerYear(UnitPeriod period)
         {
-            return period.periodType switch
+            return period.PeriodType switch
             {
-                UnitPeriodType.Monthly => Convert.ToDouble(12d / period.numPeriods),
-                UnitPeriodType.Weekly => Convert.ToDouble(52d / period.numPeriods),
+                UnitPeriodType.Monthly => Convert.ToDouble(12d / period.NumPeriods),
+                UnitPeriodType.Weekly => Convert.ToDouble(52d / period.NumPeriods),
                 UnitPeriodType.Yearly => 1d,//The maximum UnitPeriod is 1 year, so this is always 1 (as opposed to say .5 for a 2 year common period)
-                UnitPeriodType.Daily => Convert.ToDouble(365d / period.numPeriods),
+                UnitPeriodType.Daily => Convert.ToDouble(365d / period.NumPeriods),
                 _ => throw new ApplicationException("Invalid Unit Period Type passed into DaysPerPeriod"),
             };
         }
@@ -59,12 +52,12 @@ namespace APRCalculator
         /// </summary>
         internal static int DaysPerPeriod(UnitPeriod period)
         {
-            return period.periodType switch
+            return period.PeriodType switch
             {
-                UnitPeriodType.Monthly => 30 * period.numPeriods,
-                UnitPeriodType.Weekly => 7 * period.numPeriods,
-                UnitPeriodType.Yearly => 365 * period.numPeriods,
-                UnitPeriodType.Daily => period.numPeriods,
+                UnitPeriodType.Monthly => 30 * period.NumPeriods,
+                UnitPeriodType.Weekly => 7 * period.NumPeriods,
+                UnitPeriodType.Yearly => 365 * period.NumPeriods,
+                UnitPeriodType.Daily => period.NumPeriods,
                 _ => throw new ApplicationException("Invalid Unit Period Type passed into DaysPerPeriod"),
             };
         }
@@ -72,50 +65,49 @@ namespace APRCalculator
         /// <summary>
         /// Gets a number of periods between two dates based on the common period
         /// </summary>
-        internal static PeriodSpan GetNumberPeriods(DateTime StartDate, DateTime CurrentDate, UnitPeriod CommonPeriod)
+        internal static PeriodSpan GetNumberPeriods(DateTime startDate, DateTime currentDate, UnitPeriod commonPeriod)
         {
-            PeriodSpan psReturn;
             try
             {
-                if (CommonPeriod.periodType == UnitPeriodType.Monthly)
+                PeriodSpan psReturn;
+                switch (commonPeriod.PeriodType)
                 {
-                    int iMonths;
-                    DateTime dtTemp;
-                    iMonths = DiffMonths(StartDate, CurrentDate);
-                    psReturn.Periods = Convert.ToInt32(System.Math.Round(Convert.ToDouble(iMonths / CommonPeriod.numPeriods), 0));
-                    dtTemp = StartDate.AddMonths(psReturn.Periods * CommonPeriod.numPeriods);
-                    TimeSpan ts = CurrentDate - dtTemp;
-                    psReturn.OddDays = ts.Days;
-                    return psReturn;
-                }
-                else if (CommonPeriod.periodType == UnitPeriodType.Yearly)
-                {
-                    int iYears;
-                    iYears = DiffYears(StartDate, CurrentDate);
-                    psReturn.Periods = iYears; //1 year is always the max period, so we can just return the # of years
-                    TimeSpan ts = CurrentDate - StartDate.AddYears(psReturn.Periods);
-                    psReturn.OddDays = ts.Days;
-                    return psReturn;
-                }
-                else
-                {
-                    int iDays;
-                    TimeSpan ts = CurrentDate - StartDate;
-                    iDays = ts.Days;
-                    if (CommonPeriod.periodType == UnitPeriodType.Weekly)
+                    case UnitPeriodType.Monthly:
                     {
-                        int iWeeks = DiffWeeks(StartDate, CurrentDate);
-                        psReturn.Periods = Convert.ToInt32(System.Math.Round(Convert.ToDouble(iWeeks / CommonPeriod.numPeriods)));
-                        ts = CurrentDate - StartDate.AddDays(psReturn.Periods * CommonPeriod.numPeriods * 7);
+                        var iMonths = DiffMonths(startDate, currentDate);
+                        psReturn.Periods = Convert.ToInt32(System.Math.Round(Convert.ToDouble(iMonths / commonPeriod.NumPeriods), 0));
+                        var dtTemp = startDate.AddMonths(psReturn.Periods * commonPeriod.NumPeriods);
+                        var ts = currentDate - dtTemp;
                         psReturn.OddDays = ts.Days;
+                        return psReturn;
                     }
-                    else
+                    case UnitPeriodType.Yearly:
                     {
-                        psReturn.Periods = Convert.ToInt32(System.Math.Round(Convert.ToDouble(iDays / CommonPeriod.numPeriods)));
-                        ts = CurrentDate - StartDate.AddDays(psReturn.Periods * CommonPeriod.numPeriods);
+                        var iYears = DiffYears(startDate, currentDate);
+                        psReturn.Periods = iYears; //1 year is always the max period, so we can just return the # of years
+                        var ts = currentDate - startDate.AddYears(psReturn.Periods);
                         psReturn.OddDays = ts.Days;
+                        return psReturn;
                     }
-                    return psReturn;
+                    default:
+                    {
+                        var ts = currentDate - startDate;
+                        var iDays = ts.Days;
+                        if (commonPeriod.PeriodType == UnitPeriodType.Weekly)
+                        {
+                            var iWeeks = DiffWeeks(startDate, currentDate);
+                            psReturn.Periods = Convert.ToInt32(System.Math.Round(Convert.ToDouble(iWeeks / commonPeriod.NumPeriods)));
+                            ts = currentDate - startDate.AddDays(psReturn.Periods * commonPeriod.NumPeriods * 7);
+                            psReturn.OddDays = ts.Days;
+                        }
+                        else
+                        {
+                            psReturn.Periods = Convert.ToInt32(System.Math.Round(Convert.ToDouble(iDays / commonPeriod.NumPeriods)));
+                            ts = currentDate - startDate.AddDays(psReturn.Periods * commonPeriod.NumPeriods);
+                            psReturn.OddDays = ts.Days;
+                        }
+                        return psReturn;
+                    }
                 }
             }
             catch (Exception ex)
@@ -128,25 +120,25 @@ namespace APRCalculator
         /// <summary>
         /// Returns a difference in whole months between two dates.  It rounds down to the nearest whole number.
         /// </summary>
-        internal static int DiffMonths(DateTime StartDate, DateTime CurrentDate)
+        internal static int DiffMonths(DateTime startDate, DateTime currentDate)
         {
-            return ((CurrentDate.Year - StartDate.Year) * 12) + (CurrentDate.Month - StartDate.Month) - (CurrentDate.Day < StartDate.Day ? 1 : 0);
+            return ((currentDate.Year - startDate.Year) * 12) + (currentDate.Month - startDate.Month) - (currentDate.Day < startDate.Day ? 1 : 0);
         }
 
         /// <summary>
         /// Returns a difference in whole years between two dates.  It rounds down to the nearest whole number.
         /// </summary>
-        internal static int DiffYears(DateTime StartDate, DateTime CurrentDate)
+        internal static int DiffYears(DateTime startDate, DateTime currentDate)
         {
-            return (CurrentDate.Year - StartDate.Year) - (CurrentDate.DayOfYear < StartDate.DayOfYear ? 1 : 0);
+            return (currentDate.Year - startDate.Year) - (currentDate.DayOfYear < startDate.DayOfYear ? 1 : 0);
         }
 
         /// <summary>
         /// Returns a difference in whole weeks between two dates.  It rounds down to the nearest whole number.
         /// </summary>
-        internal static int DiffWeeks(DateTime StartDate, DateTime CurrentDate)
+        internal static int DiffWeeks(DateTime startDate, DateTime currentDate)
         {
-            var ts = CurrentDate - StartDate;
+            var ts = currentDate - startDate;
             return Convert.ToInt32(System.Math.Round(Convert.ToDouble(ts.Days / 7), 0));
         }
 
@@ -155,93 +147,90 @@ namespace APRCalculator
         /// </summary>
         public static UnitPeriod CalculateCommonPeriod(LineItemCollection coll)
         {
-            System.Collections.Hashtable h = new System.Collections.Hashtable();
-            System.Collections.Hashtable hCommDay = new System.Collections.Hashtable();
-            System.Collections.Hashtable hDaysInType = new System.Collections.Hashtable();
-            int iDays, iPeriods = 0;
-            bool bAllMonths = true;
-            var sKey = string.Empty;
-            int i = 1;
-            int iPerCount = 0;
+            var h = new System.Collections.Generic.Dictionary<string, int>();
+            var hCommDay = new System.Collections.Generic.Dictionary<string, int>();
+            var hDaysInType = new System.Collections.Generic.Dictionary<string, int>();
+            var bAllMonths = true;
+            var iPerCount = 0;
             coll.Sort();
             try
             {
+                int iDays;
+                var i = 1;
                 for (i = 1; i < coll.Count; i++)
                 {
                     //no common period will exist if the two line items are 
                     //on the same date, so we skip it if that is the case
-                    if (coll[i - 1].Date != coll[i].Date)
+                    if (coll[i - 1].Date == coll[i].Date) continue;
+                    var liPrior = coll[i - 1];
+                    var li = coll[i];
+                    var ts = li.Date - liPrior.Date;
+                    iDays = ts.Days;
+                    //if the day of the month is the same between
+                    //the two line items are in a month type period (unless > 1 year)
+                    //monthly will usually be the most common period type, so we check 
+                    //that one first
+                    var iPeriods = 0;
+                    string sKey;
+                    if (liPrior.Date.Day == li.Date.Day)
                     {
-                        LineItem liPrior = coll[i - 1];
-                        LineItem li = coll[i];
-                        TimeSpan ts = li.Date - liPrior.Date;
-                        iDays = ts.Days;
-                        //if the day of the month is the same between
-                        //the two line items are in a month type period (unless > 1 year)
-                        //monthly will usually be the most common period type, so we check 
-                        //that one first
-                        if (liPrior.Date.Day == li.Date.Day)
-                        {
-                            iPeriods = DiffMonths(liPrior.Date, li.Date);
-                            if(iPeriods >= 12)
-                            {
-                                iPeriods = 1;
-                                sKey = "1Y";
-                            }
-                            else
-                            {
-                                sKey = iPeriods.ToString() + "M";
-                            }
-                        }
-                        //If this is more than 365 days, then it is yearly
-                        else if (iDays > 365)
+                        iPeriods = DiffMonths(liPrior.Date, li.Date);
+                        if(iPeriods >= 12)
                         {
                             iPeriods = 1;
                             sKey = "1Y";
-                            bAllMonths = false;
-                        }
-                        //if this is more than 6 days, but has not met the prior conditions
-                        //it is a weekly period
-                        else if (iDays > 6 && iDays % 7 == 0)
-                        //else if (iDays > 6)
-                        {
-                            iPeriods = DiffWeeks(liPrior.Date, li.Date);
-                            sKey = iPeriods.ToString() + "W";
-                            bAllMonths = false;
-                        }
-                        //otherwise it is a daily period type
-                        else
-                        {
-                            iPeriods = iDays;
-                            sKey = iPeriods.ToString() + "D";
-                            bAllMonths = false;
-                        }
-
-                        //now we increment keys in the hashtable
-                        if (h.ContainsKey(sKey))
-                        {
-                            h[sKey] = Convert.ToInt32(h[sKey]) + 1;
                         }
                         else
                         {
-                            h.Add(sKey, 1);
-                            hDaysInType.Add(sKey, iDays);
-                            hCommDay.Add(sKey, li.Date.Day);
+                            sKey = iPeriods.ToString() + "M";
                         }
-                        iPerCount++;
                     }
+                    //If this is more than 365 days, then it is yearly
+                    else if (iDays > 365)
+                    {
+                        iPeriods = 1;
+                        sKey = "1Y";
+                        bAllMonths = false;
+                    }
+                    //if this is more than 6 days, but has not met the prior conditions
+                    //it is a weekly period
+                    else if (iDays > 6 && iDays % 7 == 0)
+                        //else if (iDays > 6)
+                    {
+                        iPeriods = DiffWeeks(liPrior.Date, li.Date);
+                        sKey = iPeriods.ToString() + "W";
+                        bAllMonths = false;
+                    }
+                    //otherwise it is a daily period type
+                    else
+                    {
+                        iPeriods = iDays;
+                        sKey = iPeriods.ToString() + "D";
+                        bAllMonths = false;
+                    }
+
+                    //now we increment keys in the hashtable
+                    if (h.ContainsKey(sKey))
+                    {
+                        h[sKey] = Convert.ToInt32(h[sKey]) + 1;
+                    }
+                    else
+                    {
+                        h.Add(sKey, 1);
+                        hDaysInType.Add(sKey, iDays);
+                        hCommDay.Add(sKey, li.Date.Day);
+                    }
+                    iPerCount++;
                 } //finished counting up periods
 
                 //Now we get the mode for the line item type
                 short maxCount = 0;
-                String sPerTypeMode = String.Empty;
-                foreach(System.Collections.DictionaryEntry de in h)
+                var sPerTypeMode = string.Empty;
+                foreach (var k in h.Keys.Where(k => h[k] > maxCount || 
+                                                    (h[k] == maxCount && (int) hDaysInType[sPerTypeMode] > (int) hDaysInType[k])))
                 {
-                    if((int)de.Value > maxCount || ((int)de.Value == maxCount && (int)hDaysInType[sPerTypeMode] > (int)hDaysInType[de.Key]))
-                    {
-                        maxCount = Convert.ToInt16(de.Value);
-                        sPerTypeMode = de.Key.ToString();
-                    }
+                    maxCount = Convert.ToInt16(h[k]);
+                    sPerTypeMode = k;
                 }
 
                 //Now we check to see whether we came up with a common period
@@ -249,13 +238,13 @@ namespace APRCalculator
                 if(maxCount <= 1 && h.Count > 1)
                 {
                     //get the end date
-                    DateTime dtEndDate = coll[coll.Count - 1].Date;
+                    var dtEndDate = coll[^1].Date;
 
                     //if the period count is Zero, we can't divide by it, so set it to 1
                     if(iPerCount < 1){iPerCount = 1;}
 
                     //get the average number of days between events
-                    TimeSpan tsDays = dtEndDate - coll[0].Date;
+                    var tsDays = dtEndDate - coll[0].Date;
                     iDays = Convert.ToInt32(System.Math.Round(Convert.ToDouble(tsDays.Days / iPerCount), 0));
 
                     sPerTypeMode = "1Y";
@@ -279,23 +268,23 @@ namespace APRCalculator
                 UnitPeriod upReturn;
                 if(sPerTypeMode.Contains("Y"))
                 {
-                    upReturn.numPeriods = 1;
-                    upReturn.periodType = UnitPeriodType.Yearly;
+                    upReturn.NumPeriods = 1;
+                    upReturn.PeriodType = UnitPeriodType.Yearly;
                 }
                 else if(sPerTypeMode.Contains("M"))
                 {
-                    upReturn.numPeriods = Int32.Parse(sPerTypeMode.Replace("M", String.Empty));
-                    upReturn.periodType = UnitPeriodType.Monthly;
+                    upReturn.NumPeriods = int.Parse(sPerTypeMode.Replace("M", string.Empty));
+                    upReturn.PeriodType = UnitPeriodType.Monthly;
                 }
                 else if(sPerTypeMode.Contains("W"))
                 {
-                    upReturn.numPeriods = Int32.Parse(sPerTypeMode.Replace("W", String.Empty));
-                    upReturn.periodType = UnitPeriodType.Weekly;
+                    upReturn.NumPeriods = int.Parse(sPerTypeMode.Replace("W", string.Empty));
+                    upReturn.PeriodType = UnitPeriodType.Weekly;
                 }
                 else
                 {
-                    upReturn.numPeriods = Int32.Parse(sPerTypeMode.Replace("D", String.Empty));
-                    upReturn.periodType = UnitPeriodType.Daily;
+                    upReturn.NumPeriods = int.Parse(sPerTypeMode.Replace("D", string.Empty));
+                    upReturn.PeriodType = UnitPeriodType.Daily;
                 }
                 return upReturn;
             }
@@ -317,24 +306,24 @@ namespace APRCalculator
         /// </summary>
         internal static DateTime AddPeriodToDate(DateTime currDate, UnitPeriod period)
         {
-            return period.periodType switch
+            return period.PeriodType switch
             {
-                UnitPeriodType.Monthly => currDate.AddMonths(period.numPeriods),
-                UnitPeriodType.Weekly => currDate.AddDays(period.numPeriods * 7),
-                UnitPeriodType.Daily => currDate.AddDays(period.numPeriods),
-                UnitPeriodType.Yearly => currDate.AddYears(period.numPeriods),
+                UnitPeriodType.Monthly => currDate.AddMonths(period.NumPeriods),
+                UnitPeriodType.Weekly => currDate.AddDays(period.NumPeriods * 7),
+                UnitPeriodType.Daily => currDate.AddDays(period.NumPeriods),
+                UnitPeriodType.Yearly => currDate.AddYears(period.NumPeriods),
                 _ => throw new ApplicationException("Invalid Period Type passed in"),
             };
         }
 
         internal static string GetUnitPeriodString(UnitPeriod period)
         {
-            return period.periodType switch
+            return period.PeriodType switch
             {
-                UnitPeriodType.Daily => period.numPeriods.ToString() + "D",
-                UnitPeriodType.Weekly => period.numPeriods.ToString() + "W",
-                UnitPeriodType.Monthly => period.numPeriods.ToString() + "M",
-                UnitPeriodType.Yearly => period.numPeriods.ToString() + "Y",
+                UnitPeriodType.Daily => period.NumPeriods.ToString() + "D",
+                UnitPeriodType.Weekly => period.NumPeriods.ToString() + "W",
+                UnitPeriodType.Monthly => period.NumPeriods.ToString() + "M",
+                UnitPeriodType.Yearly => period.NumPeriods.ToString() + "Y",
                 _ => throw new ApplicationException("Invalid Period Type in getUnitPeriodString"),
             };
         }

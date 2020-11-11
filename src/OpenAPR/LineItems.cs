@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 
-namespace APRCalculator
+namespace OpenAPR
 {
     public enum CollectionType
     {
@@ -13,21 +13,15 @@ namespace APRCalculator
     public class LineItemCollection : IEnumerable<LineItem>
     {
         #region "Private Fields"
-        private DateTime m_StartDate;
-        private List<LineItem> m_Items;
-        private UnitPeriod m_CommonPeriod;
-        private bool m_Completed;
-        private CollectionType m_CollType;
-        private double m_PeriodsPerYear;
-        private int m_DaysPerPeriod;
-        private double m_FinalBalance;
-        private double m_APR;
+        private DateTime startDate;
+        private readonly List<LineItem> lineItems;
+        private double Apr;
         #endregion
 
-        public LineItemCollection(CollectionType Type)
+        public LineItemCollection(CollectionType type)
         {
-            this.m_Items = new List<LineItem>();
-            this.m_CollType = Type;
+            this.lineItems = new List<LineItem>();
+            this.Type = type;
         }
 
         /// <summary>
@@ -35,74 +29,41 @@ namespace APRCalculator
         /// </summary>
         public DateTime StartDate
         {
-            get
-            {
-                return m_StartDate;
-            }
-            set
-            {
-                m_StartDate = value;
-            }
+            get => startDate;
+            set => startDate = value;
         }
 
         /// <summary>
         /// The number of line items in the collection
         /// </summary>
-        public int Count
-        {
-            get
-            {
-                return this.m_Items.Count;
-            }
-        }
+        public int Count => this.lineItems.Count;
 
         /// <summary>
         /// Indicates whether the collection has been marked as complete.  It must be marked as complete prior to using in the APR calculation
         /// </summary>
-        public bool Completed
-        {
-            get
-            {
-                return this.m_Completed;
-            }
-        }
+        public bool Completed { get; private set; }
 
         /// <summary>
         /// Indicates whether the input line item dates are Dates, or number of periods and odd days after the first line item
         /// </summary>
-        public CollectionType Type
-        {
-            get
-            {
-                return this.m_CollType;
-            }
-        }
+        public CollectionType Type { get; private set; }
 
         /// <summary>
         /// The CommonPeriod Type for this calculation.  
         /// ONLY set this if you are absolutely sure of the most frequent
         /// period per regulation Z.
         /// </summary>
-        public UnitPeriod CommonPeriod
-        {
-            get
-            {
-                return m_CommonPeriod;
-            }
-            set
-            {
-                this.m_CommonPeriod = value;
-            }
-        }
+        public UnitPeriod CommonPeriod { get; set; }
+
         /// <summary>
         /// Add a Line item
         /// </summary>
         public void Add(LineItem li)
         {
-            if (!this.m_Completed)
+            if (!this.Completed)
             {
                 li.Parent = this;
-                m_Items.Add(li);
+                lineItems.Add(li);
             }
             else
             {
@@ -114,14 +75,8 @@ namespace APRCalculator
 
         public LineItem this[int index]
         {
-            get
-            {
-                return (LineItem)this.m_Items[index];
-            }
-            set
-            {
-                this.m_Items[index] = value;
-            }
+            get => (LineItem)this.lineItems[index];
+            set => this.lineItems[index] = value;
         }
 
         /// <summary>
@@ -132,18 +87,17 @@ namespace APRCalculator
             this.Sort();
 
             //And now we calculate the Unit Period
-            this.m_CommonPeriod = DateTimeCalculations.CalculateCommonPeriod(this);
-            this.m_DaysPerPeriod = DateTimeCalculations.DaysPerPeriod(this.m_CommonPeriod);
-            this.m_PeriodsPerYear = DateTimeCalculations.PeriodsPerYear(this.m_CommonPeriod);
+            this.CommonPeriod = DateTimeCalculations.CalculateCommonPeriod(this);
+            this.DaysPerPeriod = DateTimeCalculations.DaysPerPeriod(this.CommonPeriod);
+            this.PeriodsPerYear = DateTimeCalculations.PeriodsPerYear(this.CommonPeriod);
 
             //Mark all line items as complete
-            for (int i = 0; i < this.m_Items.Count; i++)
+            foreach (var li in this.lineItems.Cast<LineItem>())
             {
-                LineItem li = (LineItem)this.m_Items[i];
                 li.Complete();
             }
            
-            m_Completed = true;
+            Completed = true;
         }
 
         /// <summary>
@@ -151,98 +105,63 @@ namespace APRCalculator
         /// </summary>
         internal void Sort()
         {
-            for (int i = this.m_Items.Count - 1; i >= 0; i--)
+            for (var i = this.lineItems.Count - 1; i >= 0; i--)
             {
-                for (int j = 0; j < i; j++)
+                for (var j = 0; j < i; j++)
                 {
-                    LineItem li = (LineItem)this.m_Items[j];
-                    LineItem liNext = (LineItem)this.m_Items[j + 1];
-                    if (li.Date > liNext.Date)
-                    {
-                        LineItem temp = liNext;
-                        this.m_Items[j + 1] = this.m_Items[j];
-                        this.m_Items[j] = temp;
-                    }
+                    var li = (LineItem)this.lineItems[j];
+                    var liNext = (LineItem)this.lineItems[j + 1];
+                    if (li.Date <= liNext.Date) continue;
+                    var temp = liNext;
+                    this.lineItems[j + 1] = this.lineItems[j];
+                    this.lineItems[j] = temp;
                 }
             }
-            this.m_StartDate = this.m_Items[0].Date;
+            this.startDate = this.lineItems[0].Date;
         }
 
         /// <summary>
         /// Number of Unit Periods Per Year
         /// </summary>
-        public double PeriodsPerYear
-        {
-            get
-            {
-                return this.m_PeriodsPerYear;
-            }
-        }
+        public double PeriodsPerYear { get; private set; }
 
         /// <summary>
         /// Number of Days in each Unit Period
         /// </summary>
-        public int DaysPerPeriod
-        {
-            get
-            {
-                return this.m_DaysPerPeriod;
-            }
-        }
+        public int DaysPerPeriod { get; private set; }
 
         /// <summary>
         /// Set the ActiveRate for all line items
         /// </summary>
-        public void SetActiveRate(double ActiveRate)
+        public void SetActiveRate(double activeRate)
         {
-            double RunningBalance = 0.0f;
-            this.m_APR = ActiveRate;
+            double runningBalance = 0.0f;
+            this.Apr = activeRate;
             //Mark all line items as complete
-            for (int i = 0; i < this.m_Items.Count; i++)
+            foreach (var li in this.lineItems)
             {
-                LineItem li = (LineItem)this.m_Items[i];
-                li.SetActiveRate(ActiveRate, RunningBalance);
-                RunningBalance = li.Balance;
+                li.SetActiveRate(activeRate, runningBalance);
+                runningBalance = li.Balance;
             }
             //Set Final Balance based on the running balance for the last line item
-            this.m_FinalBalance = RunningBalance;
+            this.FinalBalance = runningBalance;
         }
 
-        public String ToXml()
+        public string ToJson()
         {
-            System.Text.StringBuilder sb = new StringBuilder();
-            sb.AppendLine("<LineItems>");
-            sb.AppendLine("  <APR>" + this.m_APR.ToString() + "</APR>");
-            sb.AppendLine("  <CommonPeriod>" + DateTimeCalculations.GetUnitPeriodString(this.m_CommonPeriod) + "</CommonPeriod>");
-            sb.AppendLine("  <PeriodsPerYear>" + this.m_PeriodsPerYear.ToString() + "</PeriodsPerYear>");
-            sb.AppendLine("  <DaysPerPeriod>" + this.m_DaysPerPeriod.ToString() + "</DaysPerPeriod>");
-            sb.AppendLine("  <StartDate>" + this.m_StartDate.ToShortDateString() + "</StartDate>");
-            sb.AppendLine("  <FinalBalance>" + this.m_FinalBalance.ToString() + "</FinalBalance>");
-            for (int i = 0; i < this.m_Items.Count; i++)
-            {
-                LineItem li = (LineItem)this.m_Items[i];
-                sb.Append(li.ToXml());
-            }
-            sb.AppendLine("</LineItems>");
-            return sb.ToString();
+            return System.Text.Json.JsonSerializer.Serialize(this);
         }
 
         /// <summary>
         /// The balance after all items have been amortized
         /// </summary>
-        public double FinalBalance
-        {
-            get
-            {
-                return this.m_FinalBalance;
-            }
-        }
+        public double FinalBalance { get; private set; }
 
         #region IEnumerable<LineItem> Members
 
         public IEnumerator<LineItem> GetEnumerator()
         {
-            return this.m_Items.GetEnumerator();
+            return this.lineItems?.GetEnumerator();
         }
 
         #endregion
@@ -251,7 +170,7 @@ namespace APRCalculator
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
         {
-            return this.m_Items.GetEnumerator();    
+            return this.lineItems?.GetEnumerator();    
         }
 
         #endregion
