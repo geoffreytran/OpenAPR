@@ -108,6 +108,7 @@ namespace OpenAPR
       } while ((this.LineItems.FinalBalance > 0.001 || this.LineItems.FinalBalance < -0.001) && iterations < 1000);
 
       logger.LogDebug("APRCalc Diagnostics: {0}", sb);
+      Console.WriteLine(sb);
       return CalculatedAprCalc;
     }
   }
